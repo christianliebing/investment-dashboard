@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketIndex } from "@/lib/market-data";
-import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, ShieldCheck } from "lucide-react";
+import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, ShieldCheck, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface PredictionWidgetProps {
@@ -14,6 +14,19 @@ interface PredictionWidgetProps {
 
 export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidgetProps) {
     const [selectedMarket, setSelectedMarket] = useState<"SPY" | "DAX">("SPY");
+    const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+    const requestPermission = () => {
+        Notification.requestPermission().then((permission) => {
+            if (permission === "granted") {
+                setNotificationsEnabled(true);
+                new Notification("Notifications Enabled", {
+                    body: "You will catch the next big move! 🚀",
+                    icon: "/icon.png"
+                });
+            }
+        });
+    };
 
     const data = selectedMarket === "SPY" ? spyData : daxData;
     const marketName = selectedMarket === "SPY" ? "S&P 500 (SPY)" : "DAX 40";
@@ -94,6 +107,15 @@ export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidget
                     Market Forecast
                 </CardTitle>
                 <div className="flex space-x-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={requestPermission}
+                        title="Enable Notifications"
+                        disabled={notificationsEnabled}
+                    >
+                        <Bell className={`h-4 w-4 ${notificationsEnabled ? "text-green-500 fill-green-500" : "text-muted-foreground"}`} />
+                    </Button>
                     <Button
                         variant={selectedMarket === "SPY" ? "default" : "outline"}
                         size="sm"

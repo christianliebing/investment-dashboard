@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { getMarketData, MarketIndex } from "@/lib/market-data";
 import { MarketCard } from "@/components/market-card";
 import { PredictionWidget } from "@/components/prediction-widget";
@@ -12,13 +12,50 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
+  // Track previous score to trigger notifications on change
+  const prevScoreRef = useRef<number>(0);
+
+  const calculateScore = (data: MarketIndex, vixData?: MarketIndex) => {
+    if (!data?.price || !data.fiftyDayAverage) return 0;
+    let score = 0;
+    if (data.price > data.fiftyDayAverage) score++;
+    if (data.twoHundredDayAverage && data.price > data.twoHundredDayAverage) score++;
+    if ((data.changePercent || 0) > 0) score++;
+    if (data.fiftyTwoWeekHigh && data.price > (data.fiftyTwoWeekHigh * 0.95)) score++;
+    if (vixData && (vixData.price || 0) < 20) score++;
+    return score;
+  };
+
+  const checkNotifications = (spyData: MarketIndex, vixData?: MarketIndex) => {
+    const currentScore = calculateScore(spyData, vixData);
+    const prevScore = prevScoreRef.current;
+
+    if (currentScore > prevScore && currentScore >= 3 && Notification.permission === "granted") {
+      new Notification("Market Upgrade! 🚀", {
+        body: `S&P 500 Sentiment is now BULLISH (Score: ${currentScore}/5). Time to look?`,
+        icon: "/icon.png"
+      });
+    }
+    prevScoreRef.current = currentScore;
+  };
+
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // loading state only on initial load to avoid flickering
+    // setLoading(true); 
     try {
       const data = await getMarketData();
       setIndices(data);
       const now = new Date();
       setLastUpdated(now.toLocaleTimeString());
+
+      const spy = data.find(i => i.symbol === "SPY");
+      const vix = data.find(i => i.symbol === "^VIX");
+
+      // Check for notifications after data load
+      if (spy) {
+        checkNotifications(spy, vix);
+      }
+
     } catch (error) {
       console.error("Failed to fetch market data", error);
     } finally {
@@ -63,7 +100,6 @@ export default function Home() {
             variant="outline"
             size="icon"
             onClick={fetchData}
-            disabled={loading}
             className={loading ? "animate-spin" : ""}
           >
             <RefreshCcw className="h-4 w-4" />
