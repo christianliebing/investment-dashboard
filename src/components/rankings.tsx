@@ -77,44 +77,53 @@ export function Rankings({ marketData, vixData, onSelectSymbol }: RankingsProps)
         .sort((a, b) => b.investmentScore - a.investmentScore);
 
     return (
-        <Card className="h-full">
-            <CardHeader className="pb-3">
-                <CardTitle className="text-lg">📊 Best Investments</CardTitle>
-                <p className="text-xs text-muted-foreground">Sorted by weighted technical score</p>
+        <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-sm">
+            <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <CardTitle className="text-lg font-bold">🏆 Best Investments</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Sorted by weighted technical score</p>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
+            <CardContent className="space-y-2 max-h-[600px] overflow-y-auto pt-4">
                 {scoredStocks.length === 0 ? (
-                    <div className="text-center text-sm text-muted-foreground py-4">
-                        Add stocks to see rankings
+                    <div className="text-center text-sm text-muted-foreground py-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
+                        <TrendingUp className="h-8 w-8 mx-auto mb-2 text-zinc-300 dark:text-zinc-700" />
+                        <p>Add stocks to see rankings</p>
                     </div>
                 ) : (
                     scoredStocks.map((stock, index) => {
                         const isTop = index < 3;
                         const scoreColor =
-                            stock.investmentScore >= 70 ? "text-green-600" :
-                                stock.investmentScore >= 50 ? "text-green-500" :
-                                    stock.investmentScore <= 30 ? "text-red-500" :
-                                        stock.investmentScore <= 10 ? "text-red-600" :
-                                            "text-yellow-500";
+                            stock.investmentScore >= 70 ? "text-green-600 dark:text-green-400" :
+                                stock.investmentScore >= 50 ? "text-green-500 dark:text-green-400" :
+                                    stock.investmentScore <= 30 ? "text-red-500 dark:text-red-400" :
+                                        stock.investmentScore <= 10 ? "text-red-600 dark:text-red-500" :
+                                            "text-yellow-500 dark:text-yellow-400";
 
                         const bgColor =
-                            stock.investmentScore >= 70 ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900" :
-                                stock.investmentScore >= 50 ? "bg-green-50/50 dark:bg-green-950/10" :
-                                    stock.investmentScore <= 30 ? "bg-red-50/50 dark:bg-red-950/10" :
-                                        "";
+                            stock.investmentScore >= 70 ? "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-300 dark:border-green-800" :
+                                stock.investmentScore >= 50 ? "bg-green-50/50 dark:bg-green-950/10 border-green-200 dark:border-green-900" :
+                                    stock.investmentScore <= 30 ? "bg-red-50/50 dark:bg-red-950/10 border-red-200 dark:border-red-900" :
+                                        "border-zinc-200 dark:border-zinc-800";
+
+                        const rankBadge = isTop ? (
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white font-bold text-sm shadow-md">
+                                {index + 1}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold text-sm">
+                                {index + 1}
+                            </div>
+                        );
 
                         return (
                             <div
                                 key={stock.symbol}
-                                className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-zinc-400 transition-colors ${bgColor}`}
+                                className={`group flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:shadow-md transition-all duration-200 ${bgColor} ${isTop ? 'hover:scale-[1.02]' : 'hover:translate-x-1'}`}
                                 onClick={() => onSelectSymbol(stock.symbol)}
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className={`text-lg font-bold ${isTop ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                                        #{index + 1}
-                                    </div>
+                                    {rankBadge}
                                     <div>
-                                        <div className="font-bold">{stock.symbol}</div>
+                                        <div className="font-bold text-zinc-900 dark:text-zinc-50 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{stock.symbol}</div>
                                         <div className="text-xs text-muted-foreground truncate max-w-[120px]">
                                             ${stock.price?.toFixed(2)}
                                         </div>
@@ -128,9 +137,9 @@ export function Rankings({ marketData, vixData, onSelectSymbol }: RankingsProps)
                                         <div className="text-[10px] text-muted-foreground">Score</div>
                                     </div>
                                     {stock.investmentScore >= 50 ? (
-                                        <TrendingUp className="h-5 w-5 text-green-500" />
+                                        <TrendingUp className="h-5 w-5 text-green-500 group-hover:scale-110 transition-transform" />
                                     ) : stock.investmentScore <= 30 ? (
-                                        <TrendingDown className="h-5 w-5 text-red-500" />
+                                        <TrendingDown className="h-5 w-5 text-red-500 group-hover:scale-110 transition-transform" />
                                     ) : (
                                         <Minus className="h-5 w-5 text-yellow-500" />
                                     )}
