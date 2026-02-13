@@ -2,9 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketIndex } from "@/lib/market-data";
-import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, Bell, Activity } from "lucide-react";
+import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, Bell, Activity, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { PriceChart } from "./price-chart";
 
 interface PredictionWidgetProps {
     symbol: string;
@@ -134,6 +135,7 @@ function calculateWeightedScore(data: MarketIndex, vixData?: MarketIndex) {
 
 export function PredictionWidget({ symbol, data, vixData, onSelectSymbol }: PredictionWidgetProps) {
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     const requestPermission = () => {
         Notification.requestPermission().then((permission) => {
@@ -243,26 +245,47 @@ export function PredictionWidget({ symbol, data, vixData, onSelectSymbol }: Pred
                         </div>
                     </div>
 
+                    {/* Price Chart */}
+                    <div className="bg-white dark:bg-black p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                        <h3 className="text-sm font-semibold text-muted-foreground mb-2">Price Action & Trends</h3>
+                        <PriceChart data={data} />
+                    </div>
+
                     {/* Weighted Criteria Breakdown */}
                     <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Weighted Analysis</h3>
-                        <div className="grid grid-cols-1 gap-2 text-sm">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-muted-foreground">Weighted Analysis</h3>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-[10px] gap-1 px-2"
+                                onClick={() => setIsExpanded(!isExpanded)}
+                            >
+                                {isExpanded ? (
+                                    <>Less <ChevronUp className="h-3 w-3" /></>
+                                ) : (
+                                    <>Details <ChevronDown className="h-3 w-3" /></>
+                                )}
+                            </Button>
+                        </div>
+
+                        <div className={`grid gap-2 text-sm ${isExpanded ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
                             {breakdown.map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
-                                    <div className="flex flex-col flex-1">
-                                        <span className="text-muted-foreground">{item.name}</span>
-                                        <span className="text-[10px] text-zinc-400">Weight: {item.weight}x</span>
+                                <div key={idx} className={`flex ${isExpanded ? "items-center justify-between p-2" : "flex-col items-center justify-center p-3 text-center"} rounded-lg bg-white dark:bg-black border transition-all duration-200`}>
+                                    <div className={`flex flex-col ${isExpanded ? "flex-1" : "mb-1"}`}>
+                                        <span className={`text-muted-foreground ${isExpanded ? "" : "text-[11px] leading-tight"}`}>{item.name}</span>
+                                        {isExpanded && <span className="text-[10px] text-zinc-400">Weight: {item.weight}x</span>}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className={`text-xs font-bold ${item.status === 'bullish' ? 'text-green-500' :
-                                                item.status === 'bearish' ? 'text-red-500' :
-                                                    'text-yellow-500'
+                                            item.status === 'bearish' ? 'text-red-500' :
+                                                'text-yellow-500'
                                             }`}>
                                             {item.contribution > 0 ? '+' : ''}{item.contribution.toFixed(1)}
                                         </span>
-                                        {item.status === 'bullish' ? <Check className="h-5 w-5 text-green-500" /> :
-                                            item.status === 'bearish' ? <X className="h-5 w-5 text-red-500" /> :
-                                                <AlertTriangle className="h-5 w-5 text-yellow-500" />}
+                                        {item.status === 'bullish' ? <Check className={`text-green-500 ${isExpanded ? "h-5 w-5" : "h-4 w-4"}`} /> :
+                                            item.status === 'bearish' ? <X className={`text-red-500 ${isExpanded ? "h-5 w-5" : "h-4 w-4"}`} /> :
+                                                <AlertTriangle className={`text-yellow-500 ${isExpanded ? "h-5 w-5" : "h-4 w-4"}`} />}
                                     </div>
                                 </div>
                             ))}

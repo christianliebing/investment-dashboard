@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Trash2, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, Search, Loader2, ListFilter, Check } from "lucide-react";
 import { MarketIndex } from "@/lib/market-data";
 
 interface SearchResult {
@@ -21,12 +21,15 @@ interface WatchlistProps {
     marketData: MarketIndex[];
 }
 
+type SortOption = "name" | "price" | "change" | "default";
+
 export function Watchlist({ onSelectSymbol, savedSymbols, onUpdateSymbols, marketData }: WatchlistProps) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<SearchResult[]>([]);
     const [searching, setSearching] = useState(false);
+    const [sortBy, setSortBy] = useState<SortOption>("default");
+    const [showSort, setShowSort] = useState(false);
 
-    // Debounced search effect could go here, but keep simple for now
     const handleSearch = async () => {
         if (!query) return;
         setSearching(true);
@@ -54,11 +57,70 @@ export function Watchlist({ onSelectSymbol, savedSymbols, onUpdateSymbols, marke
         onUpdateSymbols(savedSymbols.filter(s => s !== symbol));
     };
 
+    const sortedSymbols = useMemo(() => {
+        if (sortBy === "default") return savedSymbols;
+
+        return [...savedSymbols].sort((a, b) => {
+            const dataA = marketData.find(m => m.symbol === a);
+            const dataB = marketData.find(m => m.symbol === b);
+
+            if (sortBy === "name") {
+                return (dataA?.symbol || a).localeCompare(dataB?.symbol || b);
+            }
+            if (sortBy === "price") {
+                return (dataB?.price || 0) - (dataA?.price || 0);
+            }
+            if (sortBy === "change") {
+                return (dataB?.changePercent || 0) - (dataA?.changePercent || 0);
+            }
+            return 0;
+        });
+    }, [savedSymbols, marketData, sortBy]);
+
+    const sortOptions: { label: string; value: SortOption }[] = [
+        { label: "Default", value: "default" },
+        { label: "Name", value: "name" },
+        { label: "Price", value: "price" },
+        { label: "Performance", value: "change" },
+    ];
+
     return (
-        <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-sm">
-            <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
-                <CardTitle className="text-lg font-bold">📋 Watchlist</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Track your favorite stocks</p>
+        <Card className="h-full shadow-md hover:shadow-lg transition-all duration-300 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-sm overflow-visible">
+            <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800 flex flex-row items-center justify-between relative">
+                <div>
+                    <CardTitle className="text-lg font-bold">📋 Watchlist</CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">Track your favorite stocks</p>
+                </div>
+                <div className="relative">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 ${sortBy !== "default" ? "text-blue-500" : ""}`}
+                        onClick={() => setShowSort(!showSort)}
+                    >
+                        <ListFilter className="h-4 w-4" />
+                    </Button>
+
+                    {showSort && (
+                        <div className="absolute right-0 top-10 w-40 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-xl z-50 p-1 animate-in fade-in zoom-in duration-150">
+                            {sortOptions.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    className="w-full text-left px-3 py-2 text-xs rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-between group"
+                                    onClick={() => {
+                                        setSortBy(opt.value);
+                                        setShowSort(false);
+                                    }}
+                                >
+                                    <span className={sortBy === opt.value ? "font-bold text-blue-600 dark:text-blue-400" : ""}>
+                                        {opt.label}
+                                    </span>
+                                    {sortBy === opt.value && <Check className="h-3 w-3 text-blue-500" />}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-4">
                 {/* Search Input */}
@@ -104,7 +166,7 @@ export function Watchlist({ onSelectSymbol, savedSymbols, onUpdateSymbols, marke
                             <p className="text-xs mt-1">Search to add stocks</p>
                         </div>
                     )}
-                    {savedSymbols.map(symbol => {
+                    {sortedSymbols.map(symbol => {
                         const data = marketData.find(m => m.symbol === symbol);
                         const price = data?.price?.toFixed(2) || "---";
                         const change = data?.changePercent?.toFixed(2);
@@ -129,7 +191,7 @@ export function Watchlist({ onSelectSymbol, savedSymbols, onUpdateSymbols, marke
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 md:opacity-0 group-hover:opacity-100 transition-opacity"
                                         onClick={(e) => removeSymbol(e, symbol)}
                                     >
                                         <Trash2 className="h-4 w-4" />
