@@ -10,16 +10,9 @@ export async function GET(request: Request) {
     // Default symbols if none provided
     let symbols = ["^GSPC", "^GDAXI", "SPY", "^VIX"];
 
-    // If symbols are provided via URL, append them (or replace? Appending seems safer for main dashboard)
-    // Actually, for the main dashboard we might want dynamic. 
-    // Let's SUPPORT an override. If 'symbols' is present, use ONLY those? 
-    // Or simpler: The frontend decides what to ask for.
-    // Let's fallback to defaults if empty.
-
+    // If symbols are provided, use ONLY those (don't merge with defaults)
     if (symbolsParam) {
-        const extraSymbols = symbolsParam.split(",").map(s => s.trim());
-        // Merge unique symbols
-        symbols = Array.from(new Set([...symbols, ...extraSymbols]));
+        symbols = symbolsParam.split(",").map(s => s.trim()).filter(s => s.length > 0);
     }
 
     try {
