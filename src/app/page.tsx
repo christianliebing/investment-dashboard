@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { getMarketData, MarketIndex } from "@/lib/market-data";
-import { MarketCard } from "@/components/market-card";
+
 import { PredictionWidget } from "@/components/prediction-widget";
 import { Watchlist } from "@/components/watchlist";
 import { Rankings } from "@/components/rankings";
@@ -28,6 +28,20 @@ export default function Home() {
       } catch (e) {
         console.error("Failed to parse watchlist", e);
       }
+    } else {
+      // Default to major US and European companies
+      const defaultSymbols = [
+        // US Tech Giants
+        "AAPL", "MSFT", "GOOGL", "AMZN", "META", "NVDA", "TSLA",
+        // US Finance & Industry
+        "JPM", "V", "WMT", "JNJ", "PG", "XOM", "BAC",
+        // European Companies
+        "ASML", "SAP", "TTE", "NVO", "OR.PA", "SIE.DE", "MC.PA",
+        // Indices
+        "SPY", "^GSPC", "^GDAXI", "^FTSE", "^STOXX50E"
+      ];
+      setSavedSymbols(defaultSymbols);
+      localStorage.setItem("watchlist", JSON.stringify(defaultSymbols));
     }
   }, []);
 
@@ -166,31 +180,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Market Cards Grid */}
-            <div>
-              <h2 className="text-lg font-semibold mb-3 text-zinc-700 dark:text-zinc-300">Market Overview</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-32 w-full rounded-xl bg-zinc-200 dark:bg-zinc-800 animate-pulse"
-                      style={{ animationDelay: `${i * 100}ms` }}
-                    />
-                  ))
-                ) : (
-                  visibleCards.map((index, i) => (
-                    <div
-                      key={index.symbol}
-                      className="animate-in slide-in-from-bottom-4"
-                      style={{ animationDelay: `${i * 50}ms`, animationDuration: '500ms' }}
-                    >
-                      <MarketCard index={index} />
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Sidebar (Right column) */}

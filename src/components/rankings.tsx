@@ -79,10 +79,10 @@ export function Rankings({ marketData, vixData, onSelectSymbol }: RankingsProps)
     return (
         <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-sm">
             <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
-                <CardTitle className="text-lg font-bold">🏆 Best Investments</CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Sorted by weighted technical score</p>
+                <CardTitle className="text-lg font-bold">🌍 Global Rankings</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Major US & European companies by score</p>
             </CardHeader>
-            <CardContent className="space-y-2 max-h-[600px] overflow-y-auto pt-4">
+            <CardContent className="space-y-2 max-h-[800px] overflow-y-auto pt-4">
                 {scoredStocks.length === 0 ? (
                     <div className="text-center text-sm text-muted-foreground py-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
                         <TrendingUp className="h-8 w-8 mx-auto mb-2 text-zinc-300 dark:text-zinc-700" />
