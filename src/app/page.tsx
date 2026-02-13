@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { getMarketData, MarketIndex } from "@/lib/market-data";
 import { MarketCard } from "@/components/market-card";
 import { PredictionWidget } from "@/components/prediction-widget";
+import { Watchlist } from "@/components/watchlist";
+import { Rankings } from "@/components/rankings";
 import { Button } from "@/components/ui/button";
 import { RefreshCcw, Clock } from "lucide-react";
 
@@ -11,6 +13,28 @@ export default function Home() {
   const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+
+  // Watchlist State
+  const [savedSymbols, setSavedSymbols] = useState<string[]>([]);
+  const [selectedSymbol, setSelectedSymbol] = useState<string>("SPY");
+
+  // Load watchlist from local storage
+  useEffect(() => {
+    const saved = localStorage.getItem("watchlist");
+    if (saved) {
+      try {
+        setSavedSymbols(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse watchlist", e);
+      }
+    }
+  }, []);
+
+  // Save watchlist to local storage
+  const updateWatchlist = (symbols: string[]) => {
+    setSavedSymbols(symbols);
+    localStorage.setItem("watchlist", JSON.stringify(symbols));
+  };
 
   // Track previous score to trigger notifications on change
   const prevScoreRef = useRef<number>(0);
@@ -43,7 +67,7 @@ export default function Home() {
     // loading state only on initial load to avoid flickering
     // setLoading(true); 
     try {
-      const data = await getMarketData();
+      const data = await getMarketData(savedSymbols);
       setIndices(data);
       const now = new Date();
       setLastUpdated(now.toLocaleTimeString());
@@ -61,11 +85,14 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [savedSymbols]);
+
+  // Re-fetch when watchlist changes
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]); // dependencies handled in useCallback but savedSymbols change triggers new callback
 
   useEffect(() => {
-    fetchData(); // Initial fetch
-
     const interval = setInterval(() => {
       fetchData();
     }, 60000); // 60 seconds
@@ -73,16 +100,21 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  const spyData = indices.find(i => i.symbol === "SPY");
-  const daxData = indices.find(i => i.symbol === "^GDAXI");
   const vixData = indices.find(i => i.symbol === "^VIX");
 
-  // Exclude SPY/VIX from the main cards list, keep indexes
-  const marketIndices = indices.filter(i => i.symbol !== "SPY" && i.symbol !== "^VIX");
+  // Selected Data for Prediction Widget
+  const activeData = indices.find(i => i.symbol === selectedSymbol);
+
+  // Exclude SPY/VIX/DAX and Watchlist items from the "Main" cards list if we want clean overview
+  // But user might want to see watchlist items as cards too?
+  // Let's keep the original logic: Show default indices separately?
+  // Actually, usually you want to see your watchlist cards.
+  // Let's filter: Show everything except VIX (it's in the widget).
+  const visibleCards = indices.filter(i => i.symbol !== "^VIX");
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 p-4 md:p-8">
-      <main className="max-w-5xl mx-auto space-y-6">
+      <main className="max-w-6xl mx-auto space-y-6">
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -107,31 +139,48 @@ export default function Home() {
           </Button>
         </header>
 
-        {/* Prediction Widget */}
-        {!loading && (
-          <section>
-            <PredictionWidget
-              spyData={spyData}
-              daxData={daxData}
-              vixData={vixData}
-            />
-          </section>
-        )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Prediction Widget (Main Column) */}
+          <div className="lg:col-span-2 space-y-6">
+            {!loading && (
+              <PredictionWidget
+                symbol={selectedSymbol}
+                data={activeData}
+                vixData={vixData}
+                onSelectSymbol={setSelectedSymbol}
+              />
+            )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? (
-            // Loading Skeletons
-            Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-32 w-full rounded-xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
-            ))
-          ) : (
-            marketIndices.map((index) => (
-              <MarketCard key={index.symbol} index={index} />
-            ))
-          )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {loading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-32 w-full rounded-xl bg-zinc-200 dark:bg-zinc-800 animate-pulse" />
+                ))
+              ) : (
+                visibleCards.map((index) => (
+                  <MarketCard key={index.symbol} index={index} />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Watchlist & Rankings (Sidebar) */}
+          <div className="lg:col-span-1 space-y-4">
+            <Watchlist
+              savedSymbols={savedSymbols}
+              onUpdateSymbols={updateWatchlist}
+              onSelectSymbol={setSelectedSymbol}
+              marketData={indices}
+            />
+            <Rankings
+              marketData={indices}
+              vixData={vixData}
+              onSelectSymbol={setSelectedSymbol}
+            />
+          </div>
         </div>
 
-        <section className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800">
+        <section className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 mt-8">
           <h2 className="text-lg font-semibold mb-2">Market Insights</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             Data provided live by Yahoo Finance. Updates automatically every 60s. Predictions based on technical analysis (50/200 DMA, VIX) and do not constitute financial advice.

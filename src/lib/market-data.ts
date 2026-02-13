@@ -12,11 +12,18 @@ export interface MarketIndex {
     twoHundredDayAverage?: number;
     fiftyTwoWeekHigh?: number;
     fiftyTwoWeekLow?: number;
+    averageVolume?: number;
+    regularMarketVolume?: number;
 }
 
-export const getMarketData = async (): Promise<MarketIndex[]> => {
+export const getMarketData = async (symbols?: string[]): Promise<MarketIndex[]> => {
     try {
-        const response = await fetch("/api/market-data");
+        const params = new URLSearchParams();
+        if (symbols && symbols.length > 0) {
+            params.append("symbols", symbols.join(","));
+        }
+
+        const response = await fetch(`/api/market-data?${params.toString()}`);
         if (!response.ok) {
             throw new Error("Failed to fetch market data");
         }

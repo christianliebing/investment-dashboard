@@ -3,8 +3,24 @@ import YahooFinance from "yahoo-finance2";
 
 const yahooFinance = new YahooFinance();
 
-export async function GET() {
-    const symbols = ["^GSPC", "^GDAXI", "SPY", "^VIX"];
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const symbolsParam = searchParams.get("symbols");
+
+    // Default symbols if none provided
+    let symbols = ["^GSPC", "^GDAXI", "SPY", "^VIX"];
+
+    // If symbols are provided via URL, append them (or replace? Appending seems safer for main dashboard)
+    // Actually, for the main dashboard we might want dynamic. 
+    // Let's SUPPORT an override. If 'symbols' is present, use ONLY those? 
+    // Or simpler: The frontend decides what to ask for.
+    // Let's fallback to defaults if empty.
+
+    if (symbolsParam) {
+        const extraSymbols = symbolsParam.split(",").map(s => s.trim());
+        // Merge unique symbols
+        symbols = Array.from(new Set([...symbols, ...extraSymbols]));
+    }
 
     try {
         const quotes = await Promise.all(
@@ -12,8 +28,8 @@ export async function GET() {
                 try {
                     const quote = await yahooFinance.quote(symbol);
                     return {
-                        symbol: quote.symbol,
-                        name: quote.shortName || quote.longName || symbol,
+                        symbol: symbol,
+                        name: symbol, // Placeholder, ideally fetch full name
                         price: quote.regularMarketPrice,
                         change: quote.regularMarketChange,
                         changePercent: quote.regularMarketChangePercent,
@@ -25,6 +41,8 @@ export async function GET() {
                         twoHundredDayAverage: quote.twoHundredDayAverage,
                         fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
                         fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+                        averageVolume: quote.averageDailyVolume3Month || quote.averageVolume,
+                        regularMarketVolume: quote.regularMarketVolume,
                     };
                 } catch (error) {
                     console.error(`Error fetching data for ${symbol}:`, error);

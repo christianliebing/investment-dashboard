@@ -1,19 +1,138 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MarketIndex } from "@/lib/market-data";
-import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, ShieldCheck, Bell } from "lucide-react";
+import { TrendingUp, TrendingDown, Gauge, Check, X, AlertTriangle, Bell, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
 
 interface PredictionWidgetProps {
-    spyData?: MarketIndex;
-    daxData?: MarketIndex;
+    symbol: string;
+    data?: MarketIndex;
     vixData?: MarketIndex;
+    onSelectSymbol: (symbol: string) => void;
 }
 
-export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidgetProps) {
-    const [selectedMarket, setSelectedMarket] = useState<"SPY" | "DAX">("SPY");
+// Calculate weighted score (0-100)
+function calculateWeightedScore(data: MarketIndex, vixData?: MarketIndex) {
+    if (!data?.price || !data.fiftyDayAverage) return { score: 50, breakdown: [] };
+
+    const price = data.price;
+    const ma50 = data.fiftyDayAverage;
+    const ma200 = data.twoHundredDayAverage || ma50;
+    const high52 = data.fiftyTwoWeekHigh || price * 1.2;
+    const low52 = data.fiftyTwoWeekLow || price * 0.8;
+    const change = data.changePercent || 0;
+    const volume = data.regularMarketVolume || 0;
+    const avgVolume = data.averageVolume || volume;
+    const vixPrice = vixData?.price || 20;
+
+    let totalWeightedScore = 0;
+    let maxPossibleScore = 0;
+    const breakdown: Array<{ name: string, score: number, weight: number, contribution: number, status: 'bullish' | 'neutral' | 'bearish' }> = [];
+
+    // 1. Price vs 50DMA (Weight: 2x)
+    const weight1 = 2;
+    const dist50 = ((price - ma50) / ma50) * 100;
+    let score1 = 0;
+    if (dist50 > 2) score1 = 1;
+    else if (dist50 < -2) score1 = -1;
+    totalWeightedScore += score1 * weight1;
+    maxPossibleScore += weight1;
+    breakdown.push({
+        name: `50DMA Distance (${dist50.toFixed(1)}%)`,
+        score: score1,
+        weight: weight1,
+        contribution: score1 * weight1,
+        status: score1 > 0 ? 'bullish' : score1 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // 2. Price vs 200DMA (Weight: 1.5x)
+    const weight2 = 1.5;
+    const dist200 = ((price - ma200) / ma200) * 100;
+    let score2 = 0;
+    if (dist200 > 2) score2 = 1;
+    else if (dist200 < -2) score2 = -1;
+    totalWeightedScore += score2 * weight2;
+    maxPossibleScore += weight2;
+    breakdown.push({
+        name: `200DMA Distance (${dist200.toFixed(1)}%)`,
+        score: score2,
+        weight: weight2,
+        contribution: score2 * weight2,
+        status: score2 > 0 ? 'bullish' : score2 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // 3. Momentum Strength (Weight: 1x)
+    const weight3 = 1;
+    let score3 = 0;
+    if (change > 1) score3 = 1;
+    else if (change < -1) score3 = -1;
+    totalWeightedScore += score3 * weight3;
+    maxPossibleScore += weight3;
+    breakdown.push({
+        name: `Momentum (${change.toFixed(2)}%)`,
+        score: score3,
+        weight: weight3,
+        contribution: score3 * weight3,
+        status: score3 > 0 ? 'bullish' : score3 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // 4. 52-Week Position (Weight: 1.5x)
+    const weight4 = 1.5;
+    const range52 = high52 - low52;
+    const position52 = ((price - low52) / range52) * 100;
+    let score4 = 0;
+    if (position52 > 70) score4 = 1;
+    else if (position52 < 30) score4 = -1;
+    totalWeightedScore += score4 * weight4;
+    maxPossibleScore += weight4;
+    breakdown.push({
+        name: `52W Position (${position52.toFixed(0)}%)`,
+        score: score4,
+        weight: weight4,
+        contribution: score4 * weight4,
+        status: score4 > 0 ? 'bullish' : score4 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // 5. Volume Trend (Weight: 1.5x)
+    const weight5 = 1.5;
+    const volumeRatio = avgVolume > 0 ? volume / avgVolume : 1;
+    let score5 = 0;
+    if (volumeRatio > 1.2) score5 = 1;
+    else if (volumeRatio < 0.8) score5 = -1;
+    totalWeightedScore += score5 * weight5;
+    maxPossibleScore += weight5;
+    breakdown.push({
+        name: `Volume (${(volumeRatio * 100).toFixed(0)}% avg)`,
+        score: score5,
+        weight: weight5,
+        contribution: score5 * weight5,
+        status: score5 > 0 ? 'bullish' : score5 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // 6. VIX Level (Weight: 2x)
+    const weight6 = 2;
+    let score6 = 0;
+    if (vixPrice < 15) score6 = 1;
+    else if (vixPrice > 25) score6 = -1;
+    totalWeightedScore += score6 * weight6;
+    maxPossibleScore += weight6;
+    breakdown.push({
+        name: `VIX Fear Gauge (${vixPrice.toFixed(1)})`,
+        score: score6,
+        weight: weight6,
+        contribution: score6 * weight6,
+        status: score6 > 0 ? 'bullish' : score6 < 0 ? 'bearish' : 'neutral'
+    });
+
+    // Normalize to 0-100 scale
+    const normalizedScore = ((totalWeightedScore + maxPossibleScore) / (2 * maxPossibleScore)) * 100;
+
+    return { score: Math.round(normalizedScore), breakdown };
+}
+
+export function PredictionWidget({ symbol, data, vixData, onSelectSymbol }: PredictionWidgetProps) {
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
     const requestPermission = () => {
@@ -28,83 +147,58 @@ export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidget
         });
     };
 
-    const data = selectedMarket === "SPY" ? spyData : daxData;
-    const marketName = selectedMarket === "SPY" ? "S&P 500 (SPY)" : "DAX 40";
+    const marketName = data?.name || symbol;
 
-    if (!data?.price || !data.fiftyDayAverage || !data.twoHundredDayAverage || !data.fiftyTwoWeekHigh) {
+    if (!data?.price || !data.fiftyDayAverage) {
         return (
-            <Card className="w-full">
+            <Card className="w-full h-full">
                 <CardHeader><CardTitle>Market Forecast</CardTitle></CardHeader>
-                <CardContent>Loading technical data...</CardContent>
+                <CardContent>
+                    <div className="flex flex-col items-center justify-center p-6 text-muted-foreground">
+                        Select a stock to view forecast...
+                        {(!data && symbol) && <span className="text-xs mt-2">Loading data for {symbol}...</span>}
+                    </div>
+                </CardContent>
             </Card>
         );
     }
 
-    // Multi-Factor Scoring Logic
-    const price = data.price;
-    const ma50 = data.fiftyDayAverage;
-    const ma200 = data.twoHundredDayAverage;
-    const high52 = data.fiftyTwoWeekHigh;
-    const change = data.changePercent || 0;
+    const { score, breakdown } = calculateWeightedScore(data, vixData);
 
-    // VIX Logic
-    const vixPrice = vixData?.price || 0;
-    const isVixCalm = vixPrice < 20;
-    const isVixHigh = vixPrice > 30;
-
-    let score = 0;
-    // 1. Trend: Price > 50 DMA
-    const above50 = price > ma50;
-    if (above50) score++;
-
-    // 2. Long Term Trend: Price > 200 DMA
-    const above200 = price > ma200;
-    if (above200) score++;
-
-    // 3. Momentum: Positive Daily Change
-    const positiveMom = change > 0;
-    if (positiveMom) score++;
-
-    // 4. Strength: Near 52-Week High (within 5%)
-    const nearHigh = price > (high52 * 0.95);
-    if (nearHigh) score++;
-
-    // 5. VIX Factor (Bonus/Penalty)
-    // If VIX is calm (<20), add 0.5 or 1 point? Let's just create a new 5 point scale or keep it simple.
-    // Plan says "New Criterion". Let's use it to augment the score.
-    if (isVixCalm) score++;
-
-    // Sentiment Determination
-    let sentiment = "NEUTRAL";
+    // Sentiment Determination based on 0-100 score
+    let sentiment = "NEUTRAL ⚖️";
     let color = "text-yellow-500";
     let bg = "bg-yellow-500/10";
     let icon = Gauge;
 
-    // Max score is now 5
-    if (score >= 4) {
-        sentiment = score === 5 ? "STRONG BULLISH 🚀" : "BULLISH 📈";
+    if (score >= 70) {
+        sentiment = "STRONG BULLISH 🚀";
+        color = "text-green-600";
+        bg = "bg-green-500/10";
+        icon = TrendingUp;
+    } else if (score >= 50) {
+        sentiment = "BULLISH 📈";
         color = "text-green-500";
         bg = "bg-green-500/10";
         icon = TrendingUp;
-    } else if (score <= 1) { // 0 or 1
+    } else if (score <= 10) {
+        sentiment = "STRONG BEARISH 📉";
+        color = "text-red-600";
+        bg = "bg-red-500/10";
+        icon = TrendingDown;
+    } else if (score <= 30) {
         sentiment = "BEARISH 🐻";
         color = "text-red-500";
         bg = "bg-red-500/10";
         icon = TrendingDown;
-    } else if (isVixHigh) {
-        // Override if VIX is extremely high
-        sentiment = "EXTREME FEAR 😱";
-        color = "text-red-600";
-        bg = "bg-red-600/10";
-        icon = AlertTriangle;
     }
 
     return (
         <Card className="w-full bg-zinc-50 dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-lg font-bold flex items-center gap-2">
-                    <Gauge className={`h-6 w-6 ${color}`} />
-                    Market Forecast
+                    <Activity className={`h-6 w-6 ${color}`} />
+                    Forecast: {symbol}
                 </CardTitle>
                 <div className="flex space-x-2">
                     <Button
@@ -117,16 +211,16 @@ export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidget
                         <Bell className={`h-4 w-4 ${notificationsEnabled ? "text-green-500 fill-green-500" : "text-muted-foreground"}`} />
                     </Button>
                     <Button
-                        variant={selectedMarket === "SPY" ? "default" : "outline"}
+                        variant={symbol === "SPY" ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setSelectedMarket("SPY")}
+                        onClick={() => onSelectSymbol("SPY")}
                     >
                         S&P 500
                     </Button>
                     <Button
-                        variant={selectedMarket === "DAX" ? "default" : "outline"}
+                        variant={symbol === "^GDAXI" ? "default" : "outline"}
                         size="sm"
-                        onClick={() => setSelectedMarket("DAX")}
+                        onClick={() => onSelectSymbol("^GDAXI")}
                     >
                         DAX
                     </Button>
@@ -145,66 +239,33 @@ export function PredictionWidget({ spyData, daxData, vixData }: PredictionWidget
                         </div>
                         <div className="text-right">
                             <span className="text-sm text-muted-foreground block mb-1">Score</span>
-                            <div className="text-3xl font-bold">{score}/5</div>
+                            <div className="text-3xl font-bold">{score}/100</div>
                         </div>
                     </div>
 
-                    {/* Criteria Checklist */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
-                            <span className="flex items-center text-muted-foreground">
-                                Short Trend ({'>'} 50DMA)
-                            </span>
-                            {above50 ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />}
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
-                            <span className="flex items-center text-muted-foreground">
-                                Long Trend ({'>'} 200DMA)
-                            </span>
-                            {above200 ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />}
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
-                            <span className="flex items-center text-muted-foreground">
-                                Momentum ({'>'} 0%)
-                            </span>
-                            {positiveMom ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />}
-                        </div>
-
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
-                            <div className="flex flex-col">
-                                <span className="flex items-center text-muted-foreground">
-                                    Strength (Near Highs)
-                                </span>
-                                <span className="text-[10px] text-zinc-400">Within 5% of 52W High</span>
-                            </div>
-                            {nearHigh ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-red-500" />}
-                        </div>
-
-                        {/* VIX Criterion */}
-                        <div className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border md:col-span-2">
-                            <div className="flex flex-col">
-                                <span className="flex items-center text-muted-foreground font-semibold">
-                                    Fear Gauge (VIX)
-                                </span>
-                                <span className="text-[10px] text-zinc-400">
-                                    Current: {vixPrice.toFixed(2)} | Low Volatility ({'<'} 20) is Bullish
-                                </span>
-                            </div>
-                            {isVixCalm ? (
-                                <div className="flex items-center text-green-500 font-bold text-xs gap-1">
-                                    <ShieldCheck className="h-5 w-5" /> CALM
+                    {/* Weighted Criteria Breakdown */}
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Weighted Analysis</h3>
+                        <div className="grid grid-cols-1 gap-2 text-sm">
+                            {breakdown.map((item, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-black border">
+                                    <div className="flex flex-col flex-1">
+                                        <span className="text-muted-foreground">{item.name}</span>
+                                        <span className="text-[10px] text-zinc-400">Weight: {item.weight}x</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-xs font-bold ${item.status === 'bullish' ? 'text-green-500' :
+                                                item.status === 'bearish' ? 'text-red-500' :
+                                                    'text-yellow-500'
+                                            }`}>
+                                            {item.contribution > 0 ? '+' : ''}{item.contribution.toFixed(1)}
+                                        </span>
+                                        {item.status === 'bullish' ? <Check className="h-5 w-5 text-green-500" /> :
+                                            item.status === 'bearish' ? <X className="h-5 w-5 text-red-500" /> :
+                                                <AlertTriangle className="h-5 w-5 text-yellow-500" />}
+                                    </div>
                                 </div>
-                            ) : isVixHigh ? (
-                                <div className="flex items-center text-red-500 font-bold text-xs gap-1">
-                                    <AlertTriangle className="h-5 w-5" /> FEAR
-                                </div>
-                            ) : (
-                                <div className="flex items-center text-yellow-500 font-bold text-xs gap-1">
-                                    <AlertTriangle className="h-5 w-5" /> ELEVATED
-                                </div>
-                            )}
+                            ))}
                         </div>
                     </div>
 
